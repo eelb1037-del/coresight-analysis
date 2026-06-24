@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="900" viewBox="0 0 1180 900" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#444"/></marker>
+    <marker id="ipi" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#c62828"/></marker>
+    <marker id="up" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2e7d32"/></marker>
+    <style>
+      .t{font-size:24px;font-weight:700;fill:#1a1a1a}
+      .s{font-size:12.5px;fill:#666}
+      .col{font-size:15px;font-weight:700}
+      .fn{font-size:12px;fill:#111;font-family:'SF Mono',Menlo,monospace}
+      .note{font-size:11px;fill:#777;font-style:italic}
+      .ipiL{font-size:11px;fill:#c62828;font-weight:700}
+    </style>
+  </defs>
+  <rect width="1180" height="900" fill="#fafafa"/>
+  <text x="40" y="44" class="t">内核 perf → PMU 调用路径 (v6.6, arm64)</text>
+  <text x="40" y="66" class="s">红色虚线 = event_function_call (IPI 到目标 CPU，因 PMU 是 per-CPU 硬件)</text>
+
+  <!-- 3 column headers -->
+  <text x="70" y="100" class="col" fill="#5e35b1">驱动调用 API</text>
+  <text x="440" y="100" class="col" fill="#1565c0">core.c（架构无关）</text>
+  <text x="880" y="100" class="col" fill="#e65100">arm PMU 驱动</text>
+  <line x1="400" y1="110" x2="400" y2="760" stroke="#ddd" stroke-dasharray="4 4"/>
+  <line x1="850" y1="110" x2="850" y2="760" stroke="#ddd" stroke-dasharray="4 4"/>
+
+  <!-- ===== ① create + install ===== -->
+  <rect x="40" y="125" width="320" height="58" rx="8" fill="#ede7f6" stroke="#7e57c2"/>
+  <text x="55" y="148" class="fn" font-weight="700">① perf_event_create_</text>
+  <text x="55" y="164" class="fn" font-weight="700">   kernel_counter()</text>
+  <text x="55" y="178" class="note">core.c:12755</text>
+
+  <rect x="420" y="125" width="410" height="120" rx="8" fill="#e3f2fd" stroke="#1976d2"/>
+  <text x="435" y="146" class="fn">perf_event_alloc → pmu->event_init</text>
+  <text x="435" y="164" class="fn">find_get_context / find_get_pmu_context</text>
+  <text x="435" y="184" class="fn" font-weight="700">perf_install_in_context  :2791</text>
+  <text x="435" y="200" class="ipiL">══ IPI 到目标 CPU ══▼</text>
+  <text x="435" y="218" class="fn">__perf_install_in_context :2723</text>
+  <text x="435" y="236" class="fn">→ event_sched_in :2480 → pmu->add</text>
+
+  <rect x="870" y="125" width="280" height="120" rx="8" fill="#fff3e0" stroke="#ef6c00"/>
+  <text x="885" y="146" class="fn">armpmu_event_init()</text>
+  <text x="885" y="161" class="note">arm_pmu.c:500 (校验+map_event)</text>
+  <text x="885" y="186" class="fn">armpmu_add()</text>
+  <text x="885" y="204" class="fn">→ armv8pmu_get_event_idx</text>
+  <text x="885" y="220" class="note">分配计数器槽</text>
+  <text x="885" y="238" class="fn">→ armv8pmu_enable_event</text>
+
+  <line x1="360" y1="150" x2="418" y2="150" stroke="#444" marker-end="url(#a)"/>
+  <line x1="830" y1="145" x2="868" y2="145" stroke="#444" marker-end="url(#a)"/>
+  <line x1="830" y1="232" x2="868" y2="200" stroke="#c62828" stroke-dasharray="5 3" marker-end="url(#ipi)"/>
+
+  <!-- ===== ② enable ===== -->
+  <rect x="40" y="270" width="320" height="44" rx="8" fill="#ede7f6" stroke="#7e57c2"/>
+  <text x="55" y="290" class="fn" font-weight="700">② perf_event_enable()</text>
+  <text x="55" y="306" class="note">core.c:2990</text>
+
+  <rect x="420" y="270" width="410" height="64" rx="8" fill="#e3f2fd" stroke="#1976d2"/>
+  <text x="435" y="290" class="fn">_perf_event_enable :2953</text>
+  <text x="435" y="306" class="ipiL">══ IPI ══▼  __perf_event_enable :2902</text>
+  <text x="435" y="324" class="fn">→ ctx_sched_in → event_sched_in → pmu->add/start</text>
+
+  <rect x="870" y="270" width="280" height="44" rx="8" fill="#fff3e0" stroke="#ef6c00"/>
+  <text x="885" y="290" class="fn">armpmu_add →</text>
+  <text x="885" y="306" class="fn">armv8pmu_enable_event</text>
+
+  <line x1="360" y1="292" x2="418" y2="292" stroke="#444" marker-end="url(#a)"/>
+  <line x1="830" y1="320" x2="868" y2="296" stroke="#c62828" stroke-dasharray="5 3" marker-end="url(#ipi)"/>
+
+  <!-- ===== ③a read_local ===== -->
+  <rect x="40" y="360" width="320" height="58" rx="8" fill="#ede7f6" stroke="#7e57c2"/>
+  <text x="55" y="382" class="fn" font-weight="700">③a perf_event_read_local()</text>
+  <text x="55" y="398" class="note">core.c:4528 — 热路径</text>
+  <text x="55" y="412" class="ipiL" fill="#2e7d32">无 IPI（须本核+关中断）</text>
+
+  <rect x="420" y="360" width="410" height="58" rx="8" fill="#e8f5e9" stroke="#2e7d32"/>
+  <text x="435" y="382" class="fn">local_irq_save + 校验在本 CPU</text>
+  <text x="435" y="400" class="fn">if (oncpu==本CPU) pmu->read  :4574</text>
+  <text x="435" y="414" class="note">直接读，count = local64_read</text>
+
+  <rect x="870" y="360" width="280" height="58" rx="8" fill="#fff3e0" stroke="#ef6c00"/>
+  <text x="885" y="388" class="fn">armv8pmu_read_counter()</text>
+  <text x="885" y="406" class="note">MRS 读 pmevcntr&lt;n&gt;_el0</text>
+
+  <line x1="360" y1="385" x2="418" y2="385" stroke="#444" marker-end="url(#a)"/>
+  <line x1="830" y1="390" x2="868" y2="390" stroke="#2e7d32" marker-end="url(#up)"/>
+
+  <!-- ===== ③b read_value ===== -->
+  <rect x="40" y="440" width="320" height="44" rx="8" fill="#ede7f6" stroke="#7e57c2"/>
+  <text x="55" y="460" class="fn" font-weight="700">③b perf_event_read_value()</text>
+  <text x="55" y="476" class="note">core.c:5428 — 可跨核</text>
+
+  <rect x="420" y="440" width="410" height="64" rx="8" fill="#e3f2fd" stroke="#1976d2"/>
+  <text x="435" y="460" class="fn">perf_event_read :4593</text>
+  <text x="435" y="476" class="ipiL">══ IPI ══▼  __perf_event_read :4446</text>
+  <text x="435" y="494" class="fn">→ pmu->read</text>
+
+  <rect x="870" y="450" width="280" height="44" rx="8" fill="#fff3e0" stroke="#ef6c00"/>
+  <text x="885" y="476" class="fn">armv8pmu_read_counter()</text>
+
+  <line x1="360" y1="462" x2="418" y2="462" stroke="#444" marker-end="url(#a)"/>
+  <line x1="830" y1="490" x2="868" y2="474" stroke="#c62828" stroke-dasharray="5 3" marker-end="url(#ipi)"/>
+
+  <!-- ===== ④ overflow sampling (bottom-up) ===== -->
+  <rect x="40" y="545" width="1110" height="190" rx="10" fill="#fff8e1" stroke="#f9a825" stroke-width="1.6"/>
+  <text x="55" y="568" class="col" fill="#f57f17">④ 溢出采样（自底向上，回调）</text>
+
+  <rect x="870" y="585" width="280" height="44" rx="8" fill="#eceff1" stroke="#455a64"/>
+  <text x="885" y="605" class="fn">计数器溢出 → PPI 中断</text>
+  <text x="885" y="621" class="note">硬件</text>
+
+  <rect x="870" y="645" width="280" height="62" rx="8" fill="#fff3e0" stroke="#ef6c00"/>
+  <text x="885" y="666" class="fn">armpmu_dispatch_irq :419</text>
+  <text x="885" y="684" class="fn">armv8pmu_handle_irq :762</text>
+  <text x="885" y="700" class="note">读 pmovsclr·update·set_period</text>
+
+  <rect x="420" y="645" width="410" height="62" rx="8" fill="#e3f2fd" stroke="#1976d2"/>
+  <text x="435" y="666" class="fn">perf_event_overflow :9575</text>
+  <text x="435" y="684" class="fn">__perf_event_overflow :9500</text>
+  <text x="435" y="700" class="note">限流 throttle → 调 overflow_handler</text>
+
+  <rect x="40" y="645" width="320" height="62" rx="8" fill="#ede7f6" stroke="#7e57c2"/>
+  <text x="55" y="668" class="fn" font-weight="700">你的 overflow_handler</text>
+  <text x="55" y="686" class="note">create 时传入</text>
+  <text x="55" y="702" class="note">默认 perf_event_output→ring buf</text>
+
+  <line x1="1010" y1="645" x2="1010" y2="631" stroke="#2e7d32" marker-end="url(#up)"/>
+  <line x1="868" y1="676" x2="832" y2="676" stroke="#2e7d32" marker-end="url(#up)"/>
+  <line x1="418" y1="676" x2="362" y2="676" stroke="#2e7d32" marker-end="url(#up)"/>
+
+  <!-- bottom takeaways -->
+  <text x="40" y="775" class="col" fill="#333">三个设计点</text>
+  <text x="40" y="798" class="s">① per-CPU 强制 IPI：create/install/enable/read_value 都经 event_function_call 送到目标核执行（PMU 寄存器只能本核访问）</text>
+  <text x="40" y="818" class="s">② read_local 是唯一免 IPI 的读法：须调用者已在目标核 + 关中断，故快但严格，热路径必用</text>
+  <text x="40" y="838" class="s">③ pmu->add/start/read 是 core 与驱动的唯一接口：驱动从不直接调 armv8pmu_*，全部经 core 转发以统一仲裁计数器</text>
+</svg>
